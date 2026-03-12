@@ -1,0 +1,12 @@
+name: grade_calculator
+description: Student Grade Calculator — Dart Backend + HTML Frontend
+version: 2.0.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  excel: ^2.1.0
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  shelf_cors_headers: ^0.1.5

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GradeCalc Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root {
+  --navy:      #0d1b2a;
+  --navy-mid:  #1a2d42;
+  --navy-light:#243b55;
+  --gold:      #c9a84c;
+  --gold-light:#e2c47a;
+  --gold-dim:  #8a6f2e;
+  --cream:     #f5f0e8;
+  --white:     #ffffff;
+  --text-main: #e8e0d0;
+  --text-muted:#8a9bb0;
+  --success:   #2ecc71;
+  --danger:    #e74c3c;
+  --warning:   #f39c12;
+  --info:      #3498db;
+  --border:    rgba(201,168,76,0.2);
+  --radius:    12px;
+  --shadow:    0 8px 32px rgba(0,0,0,0.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text-main);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 20%,rgba(201,168,76,0.06) 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(52,152,219,0.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+
+/* HEADER */
+header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:18px 36px;background:linear-gradient(135deg,var(--navy-mid),var(--navy));border-bottom:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:46px;height:46px;background:linear-gradient(135deg,var(--gold),var(--gold-dim));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 15px rgba(201,168,76,0.3)}
+.logo-text h1{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--white)}
+.logo-text span{font-size:10px;font-weight:500;color:var(--gold);letter-spacing:2px;text-transform:uppercase}
+
+/* Server status badge */
+.server-status{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;border:1px solid var(--border);font-size:12px;font-weight:500}
+.status-dot{width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+.status-dot.online{background:var(--success)}
+.status-dot.offline{background:var(--danger);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.header-stats{display:flex;gap:20px}
+.hstat{text-align:center;padding:6px 18px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px}
+.hstat-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--gold);line-height:1}
+.hstat-label{font-size:10px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
+
+/* LAYOUT */
+.app{position:relative;z-index:5;display:grid;grid-template-columns:290px 1fr;min-height:calc(100vh - 83px)}
+
+/* SIDEBAR */
+.sidebar{background:var(--navy-mid);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:22px 18px;gap:22px;overflow-y:auto}
+.sidebar-section-title{font-size:10px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:10px}
+
+/* Drop Zone */
+.drop-zone{border:2px dashed var(--gold-dim);border-radius:var(--radius);padding:24px 14px;text-align:center;cursor:pointer;transition:all 0.3s ease;background:rgba(201,168,76,0.03);position:relative;overflow:hidden}
+.drop-zone:hover,.drop-zone.active{border-color:var(--gold);background:rgba(201,168,76,0.08)}
+.drop-icon{font-size:32px;margin-bottom:8px;display:block;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.drop-zone h3{font-family:'Playfair Display',serif;font-size:14px;font-weight:600;color:var(--white);margin-bottom:5px}
+.drop-zone p{font-size:11px;color:var(--text-muted);line-height:1.5}
+.file-types{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:10px}
+.file-type-badge{font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;letter-spacing:0.5px}
+.ft-excel{background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.3)}
+.ft-csv{background:rgba(52,152,219,0.15);color:#3498db;border:1px solid rgba(52,152,219,0.3)}
+.ft-word{background:rgba(41,128,185,0.15);color:#5dade2;border:1px solid rgba(41,128,185,0.3)}
+.ft-ods{background:rgba(230,126,34,0.15);color:#e67e22;border:1px solid rgba(230,126,34,0.3)}
+.ft-txt{background:rgba(149,165,166,0.15);color:#95a5a6;border:1px solid rgba(149,165,166,0.3)}
+#fileInput{display:none}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:all 0.2s ease;text-transform:uppercase;letter-spacing:0.8px;width:100%}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:var(--navy);box-shadow:0 4px 15px rgba(201,168,76,0.25)}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(201,168,76,0.4)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-muted)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.05)}
+.btn-danger{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:#e74c3c}
+.btn-danger:hover{background:rgba(231,76,60,0.2)}
+.btn-group{display:flex;flex-direction:column;gap:8px}
+
+.file-info{background:rgba(201,168,76,0.06);border:1px solid var(--border);border-radius:8px;padding:10px;display:none}
+.file-info.show{display:block}
+.file-info-name{font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-info-meta{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+/* Grading Scale */
+.scale-table{width:100%;border-collapse:collapse}
+.scale-table tr td{padding:5px 6px;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.scale-table tr:last-child td{border:none}
+.grade-pill{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace;min-width:30px;text-align:center}
+.g-a{background:rgba(46,204,113,0.15);color:#2ecc71}
+.g-bp{background:rgba(52,152,219,0.15);color:#3498db}
+.g-b{background:rgba(41,128,185,0.15);color:#5dade2}
+.g-cp{background:rgba(243,156,18,0.15);color:#f39c12}
+.g-c{background:rgba(230,126,34,0.15);color:#e67e22}
+.g-dp{background:rgba(211,84,0,0.15);color:#d35400}
+.g-d{background:rgba(192,57,43,0.15);color:#c0392b}
+.g-f{background:rgba(231,76,60,0.15);color:#e74c3c}
+.g-na{background:rgba(127,140,141,0.15);color:#7f8c8d}
+
+/* MAIN CONTENT */
+.main-content{display:flex;flex-direction:column;overflow:hidden}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;padding:14px 24px;background:var(--navy-mid);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:7px 12px;flex:1;min-width:180px;transition:border-color 0.2s}
+.search-box:focus-within{border-color:var(--gold)}
+.search-box input{background:transparent;border:none;outline:none;color:var(--text-main);font-family:'DM Sans',sans-serif;font-size:13px;width:100%}
+.search-box input::placeholder{color:var(--text-muted)}
+.filter-select{background:var(--navy);border:1px solid var(--border);color:var(--text-main);border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:12px}
+.filter-select:focus{outline:none;border-color:var(--gold)}
+
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 24px;background:var(--navy);border-bottom:1px solid var(--border)}
+.stat-card{background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc-total::before{background:var(--gold)}
+.sc-pass::before{background:var(--success)}
+.sc-fail::before{background:var(--danger)}
+.sc-avg::before{background:var(--info)}
+.sc-top::before{background:var(--warning)}
+.stat-card-icon{font-size:18px;margin-bottom:4px}
+.stat-card-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--white);line-height:1}
+.stat-card-label{font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:3px}
+
+/* Table */
+.table-area{flex:1;overflow:auto;padding:0 24px 24px;background:var(--navy)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:280px;gap:14px;text-align:center}
+.empty-state-icon{font-size:56px;opacity:0.25}
+.empty-state h2{font-family:'Playfair Display',serif;font-size:22px;color:var(--text-muted)}
+.empty-state p{font-size:13px;color:var(--text-muted);max-width:340px;line-height:1.6}
+
+.student-table{width:100%;border-collapse:collapse;margin-top:14px;animation:fadeIn 0.4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.student-table thead tr{background:var(--navy-mid);border-bottom:2px solid var(--gold-dim)}
+.student-table th{padding:11px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:2px;white-space:nowrap;cursor:pointer;user-select:none}
+.student-table th:hover{color:var(--gold-light)}
+.student-table th.sort-asc::after{content:' ↑'}
+.student-table th.sort-desc::after{content:' ↓'}
+.student-table tbody tr{border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s}
+.student-table tbody tr:hover{background:rgba(201,168,76,0.05)}
+.student-table tbody tr.even{background:rgba(255,255,255,0.02)}
+.student-table td{padding:10px 14px;font-size:13px;color:var(--text-main)}
+.td-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted)}
+.td-name{font-weight:500;color:var(--white)}
+.td-score{font-family:'DM Mono',monospace;font-weight:500}
+.score-bar-wrap{display:flex;align-items:center;gap:8px}
+.score-bar{flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;min-width:50px}
+.score-bar-fill{height:100%;border-radius:2px;transition:width 0.6s ease}
+.valid-yes{color:var(--success);font-size:15px}
+.valid-no{color:var(--danger);font-size:15px}
+
+/* Distribution */
+.dist-section{padding:14px 24px;border-top:1px solid var(--border);background:var(--navy-mid)}
+.dist-title{font-size:10px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}
+.dist-bars{display:flex;gap:5px;align-items:flex-end;height:56px}
+.dist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.dist-bar-outer{width:100%;background:rgba(255,255,255,0.05);border-radius:4px 4px 0 0;height:44px;display:flex;align-items:flex-end;overflow:hidden}
+.dist-bar-inner{width:100%;border-radius:4px 4px 0 0;transition:height 0.8s cubic-bezier(0.34,1.56,0.64,1);min-height:2px}
+.dist-bar-label{font-size:10px;color:var(--text-muted);font-family:'DM Mono',monospace}
+.dist-bar-count{font-size:10px;color:var(--white);font-weight:600}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--navy-mid);border:1px solid var(--border);border-radius:10px;padding:11px 16px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);font-size:13px;animation:slideIn 0.3s ease;max-width:300px}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.success{border-left:3px solid var(--success)}
+.toast.error{border-left:3px solid var(--danger)}
+.toast.info{border-left:3px solid var(--info)}
+
+/* Loading */
+.loading{position:fixed;inset:0;z-index:9998;background:rgba(13,27,42,0.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading.show{display:flex}
+.spinner{width:44px;height:44px;border:3px solid rgba(201,168,76,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{font-family:'Playfair Display',serif;font-size:15px;color:var(--text-muted)}
+
+/* Server offline banner */
+.offline-banner{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:8px;padding:12px 16px;font-size:12px;color:#e74c3c;line-height:1.6;display:none}
+.offline-banner.show{display:block}
+.offline-banner code{background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--navy)}
+::-webkit-scrollbar-thumb{background:var(--navy-light);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--gold-dim)}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Processing...</p>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎓</div>
+    <div class="logo-text">
+      <h1>GradeCalc Pro</h1>
+      <span>Dart Backend · HTML Frontend</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <div class="server-status" id="serverStatus">
+      <div class="status-dot offline" id="statusDot"></div>
+      <span id="statusText">Checking server...</span>
+    </div>
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-val" id="hTotal">—</div><div class="hstat-label">Students</div></div>
+      <div class="hstat"><div class="hstat-val" id="hAvg">—</div><div class="hstat-label">Avg Score</div></div>
+      <div class="hstat"><div class="hstat-val" id="hPass">—</div><div class="hstat-label">Pass Rate</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="sidebar-section-title">🖥️ Server Connection</div>
+      <div class="offline-banner show" id="offlineBanner">
+        ⚠️ Dart server is offline.<br/>
+        In VS Code terminal run:<br/>
+        <code>dart run server.dart</code><br/>
+        then refresh this page.
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-section-title">📂 Import Data</div>
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-icon">📥</span>
+        <h3>Drop your file here</h3>
+        <p>or click to browse</p>
+        <div class="file-types" style="margin-top:10px;">
+          <span class="file-type-badge ft-excel">XLSX</span>
+          <span class="file-type-badge ft-excel">XLS</span>
+          <span class="file-type-badge ft-csv">CSV</span>
+          <span class="file-type-badge ft-word">DOCX</span>
+          <span class="file-type-badge ft-ods">ODS</span>
+          <span class="file-type-badge ft-txt">TXT</span>
+          <span class="file-type-badge ft-txt">TSV</span>
+        </div>
+      </div>
+      <input type="file" id="fileInput"
+        accept=".xlsx,.xls,.csv,.docx,.doc,.ods,.txt,.tsv"/>
+
+      <div class="file-info" id="fileInfo" style="margin-top:10px;">
+        <div class="file-info-name" id="fileName">—</div>
+        <div class="file-info-meta" id="fileMeta">—</div>
+      </div>
+    </div>
+
+    <div id="exportSection" style="display:none;">
+      <div class="sidebar-section-title">💾 Export Results</div>
+      <div class="btn-group">
+        <button class="btn btn-gold" onclick="exportExcel()">📊 Export to Excel</button>
+        <a href="http://localhost:8080/export/csv" download="grade_report.csv">
+          <button class="btn btn-outline">📄 Export to CSV (via Dart)</button>
+        </a>
+        <button class="btn btn-danger" onclick="clearData()">🗑️ Clear All Data</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-section-title">📏 Grading Scale</div>
+      <table class="scale-table">
+        <tr><td>80–100</td><td><span class="grade-pill g-a">A</span></td><td style="font-size:11px;color:var(--text-muted)">Excellent</td></tr>
+        <tr><td>70–79</td><td><span class="grade-pill g-bp">B+</span></td><td style="font-size:11px;color:var(--text-muted)">Very Good</td></tr>
+        <tr><td>60–69</td><td><span class="grade-pill g-b">B</span></td><td style="font-size:11px;color:var(--text-muted)">Good</td></tr>
+        <tr><td>56–59</td><td><span class="grade-pill g-cp">C+</span></td><td style="font-size:11px;color:var(--text-muted)">Above Avg</td></tr>
+        <tr><td>50–55</td><td><span class="grade-pill g-c">C</span></td><td style="font-size:11px;color:var(--text-muted)">Average</td></tr>
+        <tr><td>46–49</td><td><span class="grade-pill g-dp">D+</span></td><td style="font-size:11px;color:var(--text-muted)">Below Avg</td></tr>
+        <tr><td>40–45</td><td><span class="grade-pill g-d">D</span></td><td style="font-size:11px;color:var(--text-muted)">Poor</td></tr>
+        <tr><td>0–39</td><td><span class="grade-pill g-f">F</span></td><td style="font-size:11px;color:var(--text-muted)">Fail</td></tr>
+      </table>
+    </div>
+
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+
+    <div class="toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search by name or ID…" oninput="filterTable()"/>
+      </div>
+      <select class="filter-select" id="gradeFilter" onchange="filterTable()">
+        <option value="">All Grades</option>
+        <option>A</option><option>B+</option><option>B</option>
+        <option>C+</option><option>C</option><option>D+</option>
+        <option>D</option><option>F</option>
+      </select>
+      <select class="filter-select" id="statusFilter" onchange="filterTable()">
+        <option value="">All Students</option>
+        <option value="pass">Passing (≥40)</option>
+        <option value="fail">Failing (&lt;40)</option>
+        <option value="top">Top Grade A</option>
+      </select>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card sc-total"><div class="stat-card-icon">👥</div><div class="stat-card-val" id="statTotal">0</div><div class="stat-card-label">Total Students</div></div>
+      <div class="stat-card sc-pass"><div class="stat-card-icon">✅</div><div class="stat-card-val" id="statPass">0</div><div class="stat-card-label">Passing</div></div>
+      <div class="stat-card sc-fail"><div class="stat-card-icon">❌</div><div class="stat-card-val" id="statFail">0</div><div class="stat-card-label">Failing</div></div>
+      <div class="stat-card sc-avg"><div class="stat-card-icon">📊</div><div class="stat-card-val" id="statAvg">—</div><div class="stat-card-label">Average Score</div></div>
+      <div class="stat-card sc-top"><div class="stat-card-icon">🏆</div><div class="stat-card-val" id="statTop">—</div><div class="stat-card-label">Highest Score</div></div>
+    </div>
+
+    <div class="table-area">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">📂</div>
+        <h2>No Data Loaded</h2>
+        <p>Start the Dart server in VS Code, then drop a file to import student data. The Dart backend will calculate all grades.</p>
+      </div>
+      <table class="student-table" id="studentTable" style="display:none;">
+        <thead>
+          <tr>
+            <th onclick="sortTable('idx')">#</th>
+            <th onclick="sortTable('id')">Student ID</th>
+            <th onclick="sortTable('name')">Name</th>
+            <th onclick="sortTable('score')">Score</th>
+            <th>Progress</th>
+            <th onclick="sortTable('grade')">Grade</th>
+            <th>Remarks</th>
+            <th>Valid</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="dist-section" id="distSection" style="display:none;">
+      <div class="dist-title">Grade Distribution</div>
+      <div class="dist-bars" id="distBars"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080';
+let allStudents = [];
+let filteredStudents = [];
+let sortCol = 'idx', sortDir = 1;
+
+// ═══════════════════════
+// SERVER HEALTH CHECK
+// ═══════════════════════
+async function checkServer() {
+  try {
+    const res = await fetch(API + '/stats', {signal: AbortSignal.timeout(2000)});
+    setOnline(true);
+  } catch {
+    setOnline(false);
+  }
+}
+
+function setOnline(online) {
+  const dot    = document.getElementById('statusDot');
+  const text   = document.getElementById('statusText');
+  const banner = document.getElementById('offlineBanner');
+  if (online) {
+    dot.className   = 'status-dot online';
+    text.textContent = '✅ Dart Server Online';
+    banner.classList.remove('show');
+  } else {
+    dot.className   = 'status-dot offline';
+    text.textContent = '❌ Server Offline';
+    banner.classList.add('show');
+  }
+}
+
+// Check every 5 seconds
+checkServer();
+setInterval(checkServer, 5000);
+
+// ═══════════════════════
+// FILE HANDLING
+// ═══════════════════════
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('active');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  showLoading(`Sending ${file.name} to Dart server...`);
+
+  document.getElementById('fileInfo').classList.add('show');
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileMeta').textContent =
+    `${ext.toUpperCase()} · ${(file.size/1024).toFixed(1)} KB · Processed by Dart`;
+
+  try {
+    let response;
+
+    if (['xlsx','xls','ods'].includes(ext)) {
+      // Send binary directly to Dart
+      const bytes = await file.arrayBuffer();
+      response = await fetch(API + '/upload', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/octet-stream'},
+        body: bytes
+      });
+
+    } else if (['csv','tsv','txt'].includes(ext)) {
+      // Send as text JSON to Dart
+      const text = await file.text();
+      response = await fetch(API + '/upload', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: text, type: ext})
+      });
+
+    } else if (['docx','doc'].includes(ext)) {
+      // Extract text client-side via mammoth, send as CSV-style to Dart
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer});
+      response = await fetch(API + '/upload', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: result.value, type: 'txt'})
+      });
+
+    } else {
+      hideLoading();
+      showToast('Unsupported file type: .' + ext, 'error');
+      return;
+    }
+
+    if (!response.ok) throw new Error('Server returned ' + response.status);
+
+    const data = await response.json();
+    hideLoading();
+
+    if (data.success) {
+      allStudents = data.students.map((s, i) => ({...s, idx: i+1}));
+      filteredStudents = [...allStudents];
+      renderAll(data.stats);
+      document.getElementById('exportSection').style.display = 'block';
+      showToast(`✅ ${allStudents.length} students graded by Dart backend!`, 'success');
+      setOnline(true);
+    } else {
+      showToast('❌ ' + (data.error || 'Unknown error'), 'error');
+    }
+
+  } catch (err) {
+    hideLoading();
+    setOnline(false);
+    showToast('❌ Cannot reach Dart server. Run: dart run server.dart', 'error');
+  }
+}
+
+// ═══════════════════════
+// RENDER
+// ═══════════════════════
+function renderAll(stats) {
+  if (stats) updateStats(stats);
+  else updateStatsFromData();
+  renderTable();
+  renderDistribution();
+  updateHeader();
+}
+
+function updateHeader() {
+  const scores = allStudents.filter(s => s.score !== null);
+  const avg    = scores.length ? (scores.reduce((a,b)=>a+b.score,0)/scores.length) : null;
+  const pass   = allStudents.filter(s=>(s.score||0)>=40).length;
+  const pct    = allStudents.length ? Math.round(pass/allStudents.length*100) : 0;
+  document.getElementById('hTotal').textContent = allStudents.length || '—';
+  document.getElementById('hAvg').textContent   = avg ? avg.toFixed(1) : '—';
+  document.getElementById('hPass').textContent  = allStudents.length ? pct+'%' : '—';
+}
+
+function updateStats(stats) {
+  document.getElementById('statTotal').textContent = stats.total;
+  document.getElementById('statPass').textContent  = stats.passing;
+  document.getElementById('statFail').textContent  = stats.failing;
+  document.getElementById('statAvg').textContent   = stats.averageScore ? stats.averageScore.toFixed(1) : '—';
+  document.getElementById('statTop').textContent   = stats.highestScore !== null ? stats.highestScore.toFixed(1) : '—';
+}
+
+function updateStatsFromData() {
+  const scores = allStudents.filter(s=>s.score!==null&&!isNaN(s.score));
+  const avg    = scores.length ? scores.reduce((a,b)=>a+b.score,0)/scores.length : null;
+  const top    = scores.length ? Math.max(...scores.map(s=>s.score)) : null;
+  document.getElementById('statTotal').textContent = allStudents.length;
+  document.getElementById('statPass').textContent  = allStudents.filter(s=>(s.score||0)>=40).length;
+  document.getElementById('statFail').textContent  = allStudents.filter(s=>(s.score||0)<40).length;
+  document.getElementById('statAvg').textContent   = avg ? avg.toFixed(1) : '—';
+  document.getElementById('statTop').textContent   = top !== null ? top.toFixed(1) : '—';
+}
+
+function gradeClass(g) {
+  return {'A':'g-a','B+':'g-bp','B':'g-b','C+':'g-cp','C':'g-c','D+':'g-dp','D':'g-d','F':'g-f'}[g]||'g-na';
+}
+function scoreColor(s) {
+  if(s>=80) return '#2ecc71';
+  if(s>=60) return '#3498db';
+  if(s>=40) return '#f39c12';
+  return '#e74c3c';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const table = document.getElementById('studentTable');
+  const empty = document.getElementById('emptyState');
+  if (!filteredStudents.length) {
+    table.style.display='none'; empty.style.display='flex';
+    empty.querySelector('h2').textContent = allStudents.length ? 'No matching students' : 'No Data Loaded';
+    return;
+  }
+  empty.style.display='none'; table.style.display='table';
+  tbody.innerHTML = filteredStudents.map((s,i) => {
+    const sc  = s.score!==null&&!isNaN(s.score) ? s.score.toFixed(1) : 'N/A';
+    const pct = s.score!==null&&!isNaN(s.score) ? Math.min(100,s.score) : 0;
+    const col = s.score!==null ? scoreColor(s.score) : '#7f8c8d';
+    const gc  = gradeClass(s.grade);
+    return `<tr class="${i%2===0?'even':''}">
+      <td class="td-id">${s.idx}</td>
+      <td class="td-id">${s.id||'—'}</td>
+      <td class="td-name">${s.name||'—'}</td>
+      <td class="td-score" style="color:${col}">${sc}</td>
+      <td><div class="score-bar-wrap">
+        <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <span style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;min-width:30px">${pct.toFixed(0)}%</span>
+      </div></td>
+      <td><span class="grade-pill ${gc}">${s.grade}</span></td>
+      <td style="font-size:12px;color:var(--text-muted)">${s.remarks}</td>
+      <td style="text-align:center">${s.valid?'<span class="valid-yes">✓</span>':'<span class="valid-no">✗</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDistribution() {
+  const dist = document.getElementById('distSection');
+  const bars = document.getElementById('distBars');
+  if (!allStudents.length) { dist.style.display='none'; return; }
+  dist.style.display='block';
+  const grades = ['A','B+','B','C+','C','D+','D','F'];
+  const colors = {'A':'#2ecc71','B+':'#3498db','B':'#5dade2','C+':'#f39c12','C':'#e67e22','D+':'#d35400','D':'#c0392b','F':'#e74c3c'};
+  const counts = {};
+  grades.forEach(g=>counts[g]=0);
+  allStudents.forEach(s=>{if(counts[s.grade]!==undefined)counts[s.grade]++});
+  const max = Math.max(1,...Object.values(counts));
+  bars.innerHTML = grades.map(g=>{
+    const c=counts[g], pct=Math.round(c/max*100);
+    return `<div class="dist-bar-wrap">
+      <div class="dist-bar-count">${c||''}</div>
+      <div class="dist-bar-outer"><div class="dist-bar-inner" style="height:${pct}%;background:${colors[g]}"></div></div>
+      <div class="dist-bar-label">${g}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════
+// FILTER & SORT
+// ═══════════════════════
+function filterTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const grade  = document.getElementById('gradeFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  filteredStudents = allStudents.filter(s => {
+    const ms = !search || (s.name&&s.name.toLowerCase().includes(search)) || (s.id&&s.id.toLowerCase().includes(search));
+    const mg = !grade  || s.grade===grade;
+    const mt = !status ||
+      (status==='pass'&&(s.score||0)>=40) ||
+      (status==='fail'&&(s.score||0)<40)  ||
+      (status==='top' &&s.grade==='A');
+    return ms&&mg&&mt;
+  });
+  sortData(); renderTable();
+}
+
+function sortTable(col) {
+  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
+  sortData(); renderTable();
+}
+function sortData() {
+  filteredStudents.sort((a,b)=>{
+    let av=a[sortCol],bv=b[sortCol];
+    if(av===null||av===undefined)return 1;
+    if(bv===null||bv===undefined)return -1;
+    if(typeof av==='string')av=av.toLowerCase();
+    if(typeof bv==='string')bv=bv.toLowerCase();
+    return av<bv?-sortDir:av>bv?sortDir:0;
+  });
+}
+
+// ═══════════════════════
+// EXPORT
+// ═══════════════════════
+function exportExcel() {
+  if(!allStudents.length){showToast('No data to export','error');return;}
+  const data=[
+    ['Student ID','Student Name','Score','Grade','Remarks','Valid'],
+    ...allStudents.map(s=>[s.id,s.name,s.score!==null?s.score:'N/A',s.grade,s.remarks,s.valid?'YES':'NO'])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Grade Report');
+  XLSX.writeFile(wb,'grade_report.xlsx');
+  showToast('📊 Exported to grade_report.xlsx','success');
+}
+
+function clearData() {
+  allStudents=[]; filteredStudents=[];
+  document.getElementById('studentTable').style.display='none';
+  document.getElementById('emptyState').style.display='flex';
+  document.getElementById('distSection').style.display='none';
+  document.getElementById('exportSection').style.display='none';
+  document.getElementById('fileInfo').classList.remove('show');
+  document.getElementById('searchInput').value='';
+  updateStatsFromData(); updateHeader();
+  showToast('Data cleared','info');
+}
+
+// ═══════════════════════
+// UI HELPERS
+// ═══════════════════════
+function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('loading').classList.add('show')}
+function hideLoading(){document.getElementById('loading').classList.remove('show')}
+function showToast(msg,type='info'){
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+updateStatsFromData(); updateHeader();
+</script>
+</body>
+</html>
