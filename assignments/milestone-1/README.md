@@ -1,1 +1,1 @@
-This folder contains the exercises 1,2 and 3
+This folder contains the assignment of exercises 1
